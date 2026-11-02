@@ -4,6 +4,7 @@ export {
   runFFmpeg,
   probeTextRender,
   stageTextAssets,
+  defaultTextAssetRoot,
   DEFAULT_REQUIRED_FILTERS,
   DEFAULT_REQUIRED_ENCODERS,
   DEFAULT_EXEC_TIMEOUT_MS,

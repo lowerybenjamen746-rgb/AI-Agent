@@ -56,6 +56,7 @@ payload against an in-memory registry. Replace it with your own — see
 - [Worker guide](docs/WORKER.md)
 - [Testing](docs/TESTING.md)
 - [Licensing](docs/LICENSING.md)
+- [Releasing](docs/RELEASING.md)
 - [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md)
 
 ## Status

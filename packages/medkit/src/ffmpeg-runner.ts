@@ -30,6 +30,7 @@ import {
 import { mkdtemp, readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface FFmpegEvent {
   type?: string;
@@ -235,18 +236,49 @@ const textRenderProbes = new Map<string, string | null>();
 let nativeTextEnvironment: { env: NodeJS.ProcessEnv; directory: string } | null = null;
 
 /**
- * Stage a font and a private fontconfig file so text filters do not depend on
- * the host's `/etc/fonts`. Returns null when the assets are not present, in
- * which case a text probe reports a clear failure instead of guessing.
+ * Directory holding the shipped text assets.
+ *
+ * Resolved from THIS module's location (`assets/` sits beside `dist/` and
+ * `src/`), not from `process.cwd()`: as an installed dependency the caller's
+ * working directory has nothing to do with where medkit was unpacked. Callers
+ * that vendor or relocate the assets pass `cwd` explicitly.
  */
-export function stageTextAssets({ cwd = process.cwd(), fontDirToken = TEXT_FONT_DIR_TOKEN } = {}) {
-  if (nativeTextEnvironment) return nativeTextEnvironment;
-  const root = join(cwd, BUNDLED_TEXT_ASSET_DIR);
+export function defaultTextAssetRoot(): string {
+  return fileURLToPath(new URL('../assets/ffmpeg/', import.meta.url));
+}
+
+/**
+ * Stage a font and a private fontconfig file so text filters do not depend on
+ * the host's `/etc/fonts`. Throws with the searched path when the assets are
+ * not present, so a text probe reports a clear failure instead of guessing.
+ *
+ * `cwd` replaces the module-relative asset root; `process.cwd()` is never used
+ * implicitly.
+ *
+ * Caching: the staged directory is created once per PROCESS and then reused.
+ * A later call validates its own `root` (so a wrong `cwd` still throws), but a
+ * valid `cwd` pointing at different assets does NOT re-stage them — the first
+ * successful staging wins for the life of the process. This is deliberate:
+ * every native FFmpeg child in one process must see the same FONTCONFIG_FILE,
+ * and re-staging mid-run would leave earlier children pointing at a deleted
+ * directory. To use different assets, start a new process.
+ *
+ * The staging directory is removed on process exit (best effort) and lives
+ * under the OS temp directory.
+ */
+export function stageTextAssets({ cwd, fontDirToken = TEXT_FONT_DIR_TOKEN }: { cwd?: string; fontDirToken?: string } = {}) {
+  const root = cwd ? join(cwd, BUNDLED_TEXT_ASSET_DIR) : defaultTextAssetRoot();
   const configSource = join(root, BUNDLED_TEXT_CONFIG);
   const fontSource = join(root, 'fonts', 'drawtext.ttf');
   if (!existsSync(configSource) || !existsSync(fontSource)) {
-    throw new Error(`Bundled native text assets are missing under ${root}; provide assets/ffmpeg/fonts.conf and fonts/drawtext.ttf`);
+    throw new Error(
+      `Bundled native text assets are missing under ${root} (expected ${BUNDLED_TEXT_CONFIG} and fonts/drawtext.ttf). ` +
+        'Pass stageTextAssets({ cwd }) pointing at a directory that contains assets/ffmpeg, or reinstall the package.',
+    );
   }
+  // Validate the requested root BEFORE returning a cached staging result, so an
+  // explicit (and wrong) cwd fails instead of silently reusing the default.
+  if (nativeTextEnvironment) return nativeTextEnvironment;
   const template = readFileSync(configSource, 'utf8');
   if (!template.includes(fontDirToken)) throw new Error(`bundled fontconfig template is missing ${fontDirToken}`);
 

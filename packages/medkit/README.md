@@ -5,8 +5,20 @@ pipelines.
 
 ## Install
 
+> This package is **not published to npm**. `npm install @ai-agent/medkit`
+> does not work yet. Install it from source.
+
 ```bash
-npm install @ai-agent/medkit
+git clone https://github.com/lowerybenjamen746-rgb/AI-AGENT.git
+cd AI-AGENT/packages/medkit
+npm ci
+npm run build               # TypeScript -> dist/
+```
+
+Or add it to another project by path:
+
+```bash
+npm install /path/to/AI-AGENT/packages/medkit
 ```
 
 You must provide an FFmpeg binary. This package does **not** ship one.
@@ -16,7 +28,7 @@ then `ffmpeg` on `PATH`, then common install locations.
 ## Use
 
 ```ts
-import { detectFFmpeg, runFFmpeg, probeVideoFileByPath } from '@ai-agent/medkit';
+import { detectFFmpeg, probeVideoFileByPath, runFFmpeg } from '@ai-agent/medkit';
 
 const capability = detectFFmpeg();
 if (!capability.available) throw new Error(capability.reason);
@@ -53,6 +65,18 @@ console.log(info.video?.durationSeconds, info.video?.width, info.video?.height);
 By default the required filters/encoders for a typical H.264 + subtitles chain
 are checked (`DEFAULT_REQUIRED_FILTERS`, `libx264`, `aac`). If your chain is
 different, pass `requiredFilters` / `requiredEncoders` to `detectFFmpeg()`.
+
+Text rendering (`drawtext`) needs a font. The font and a private fontconfig
+file ship in the package's own `assets/ffmpeg/`, resolved relative to the
+installed module — not to your working directory — so
+`detectFFmpeg({ checkTextRender: true })` works from any project. If you vendor
+or relocate those assets, pass `stageTextAssets({ cwd })` pointing at a
+directory that contains `assets/ffmpeg`.
+
+The staged font directory is created **once per process** and reused; the
+first successful staging wins for the life of that process. A later call
+validates its own root (so a wrong `cwd` throws) but does not re-stage
+different assets — start a new process if you need to switch them.
 
 Note that builds such as the common static `--enable-gpl --enable-libx264`
 build are GPLv3; that obligation is yours to satisfy for the binary you use.

@@ -41,8 +41,33 @@ First public extraction. Independent packages, no private dependencies.
 - A chunked (`Transfer-Encoding: chunked`) request body is now read correctly.
 - A pending run can no longer hold the server open forever on shutdown.
 
+### Fixed after the first publication (CI)
+
+- Test scripts no longer quote the test glob: Node.js 20.11 does not expand a
+  quoted glob for `--test`, so the runner received a literal path and failed
+  before running a test. Shell expansion works on 20.11, 22 and 24.
+- The CI secret scan assembles its pattern from fragments and skips the scanner
+  files, so the workflow no longer fails on its own source while still
+  detecting a synthetic token.
+- CI steps invoke the package `npm test` scripts instead of their own quoted
+  glob, so the workflow and the documented command cannot diverge again.
+
+### Changed after the first publication (docs)
+
+- The package READMEs state that the packages are **not published to npm** and
+  document source installation instead of an install command that returns 404.
+- `medkit` resolves its text-render assets relative to the installed module
+  instead of `process.cwd()`; an explicit `stageTextAssets({ cwd })` override is
+  still honoured and now validated before a cached result is reused.
+- Documented operational limits: 256 KiB request cap, HTTP-only transport,
+  `TMPDIR` location, 24-hour default temp retention and the in-memory reference
+  adapter's restart behaviour.
+
 ### Known limitations
 
 - `transcript-utils` has no built-in provider clients; it operates on data.
 - The worker is HTTP-only by design; terminate TLS in front of it.
-- No FFmpeg binary is distributed.
+- No FFmpeg binary is distributed; you supply the build and its licence
+  obligations.
+- The packages are not on npm. The `@ai-agent` scope has not been verified as
+  owned by this project.

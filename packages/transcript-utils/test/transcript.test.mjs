@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   absoluteSegment,
+  assertTranscriptTimestamps,
+  srtBlob,
   absoluteSegments,
   canonicalTranscriptToSrt,
   clipSegmentsToRange,
@@ -139,4 +141,44 @@ test('re-timing an SRT scales every cue and leaves text and indices alone', () =
 test('an SRT that gains an end before its start is floored to a positive event', () => {
   const scaled = scaleSrtTimestamps('1\n00:00:00,100 --> 00:00:00,200\nx\n', 0.0001);
   assert.match(scaled, /00:00:00,000 --> 00:00:00,001/);
+});
+
+test('srtBlob returns null for empty output and a text blob otherwise', async () => {
+  assert.equal(srtBlob(''), null);
+  assert.equal(srtBlob('   \n'), null);
+  const blob = srtBlob('1\n00:00:00,000 --> 00:00:01,000\nhi');
+  assert.ok(blob instanceof Blob);
+  assert.equal(blob.type, 'text/plain');
+  assert.equal(await blob.text(), '1\n00:00:00,000 --> 00:00:01,000\nhi\n');
+});
+
+test('assertTranscriptTimestamps accepts valid segments and rejects each malformed shape', () => {
+  const valid = [segment({ start: 0, end: 1, words: [{ text: 'a', start: 0, end: 1 }] })];
+  assert.doesNotThrow(() => assertTranscriptTimestamps(valid));
+
+  for (const bad of [
+    { start: 2, end: 1, words: [] },
+    { start: Number.NaN, end: 1, words: [] },
+    { start: 0, end: 1, words: [{ text: 'a', start: 0.5, end: 0.4 }] },
+    { start: 0, end: 1, words: [{ text: 'a', start: 0, end: 2 }] },
+    { start: 0, end: 1, words: [{ text: 'a', start: 0.8, end: 1 }, { text: 'b', start: 0.2, end: 0.9 }] },
+  ]) {
+    assert.throws(() => assertTranscriptTimestamps([segment(bad)]), /Malformed transcript/, JSON.stringify(bad));
+  }
+});
+
+// The README example is executed verbatim so documentation cannot drift from
+// the exported API (audit finding 4).
+test('the transcript-utils README example produces the documented result', () => {
+  const providerSegments = [{ text: 'hello world', start: 0, end: 2, timestampSource: 'segment' }];
+  const segments = absoluteSegments(providerSegments, {
+    chunk: { index: 2, startSeconds: 120, endSeconds: 180, durationSeconds: 60, subdivisionDepth: 0 },
+    provider: 'whisper',
+  });
+  const selected = selectTranscriptSegments(segments, { startSeconds: 120, endSeconds: 126 });
+  assert.equal(selected.length, 1, 'the documented window must contain the spoken segment');
+  assert.equal(segments[0].start, 120);
+
+  const srt = canonicalTranscriptToSrt({ segments, startSeconds: 120, endSeconds: 126 });
+  assert.equal(srt, '1\n00:00:00,000 --> 00:00:02,000\nhello world\n');
 });

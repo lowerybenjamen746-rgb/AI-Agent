@@ -6,10 +6,19 @@ Node built-ins only — there are no runtime dependencies.
 
 ## Install
 
+> This package is **not published to npm**. `npm install @ai-agent/media-worker`
+> does not work yet. Install it from source.
+
 ```bash
-npm install @ai-agent/media-worker
-# or run from this repository
-node src/index.mjs
+git clone https://github.com/lowerybenjamen746-rgb/AI-AGENT.git
+cd AI-AGENT/packages/media-worker
+node src/index.mjs          # no dependency install needed
+```
+
+Or add it to another project by path:
+
+```bash
+npm install /path/to/AI-AGENT/packages/media-worker
 ```
 
 ## Run

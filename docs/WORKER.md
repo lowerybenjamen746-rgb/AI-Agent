@@ -59,13 +59,35 @@ activeRuns }`. `shutdown()` refuses new deliveries, aborts in-flight runs and
 waits for them; `closeServer({ graceMs })` always settles, destroying remaining
 sockets after the grace period.
 
-## Temp directories
+## Operational limits
+
+| Limit | Behaviour |
+|---|---|
+| Request body | **256 KiB** (`MAX_REQUEST_BYTES`). A larger body is refused with `400`; it is never truncated. |
+| Transport | **HTTP only, no TLS.** Run it behind a TLS-terminating tunnel or reverse proxy; never expose it directly to the internet. |
+| Bind address | Loopback (`127.0.0.1`) unless `MEDIA_WORKER_HOST` is set or a platform assigns `SERVER_PORT`. |
+| Concurrency | One run per unit id; a second delivery under the same lease is idempotent, a different lease is `409`. |
+| Shutdown | Refuses new deliveries, aborts in-flight runs, then closes; sockets still open after `graceMs` (default 5 s) are destroyed. |
+
+### Temp directories
+
+Workspaces are created under the OS temp directory (`TMPDIR`). Set `TMPDIR` to
+move them onto a dedicated volume.
 
 `cleanupStaleWorkerTempDirectories({ root, maxAgeMs, prefixes })` removes only
-directories matching `prefixes` older than `maxAgeMs` (default 24 h). Pass your
-own prefixes; the default `media-worker-*` set matches what this package
-documents. An empty list or an empty string is refused, because either would
-degenerate into "delete everything in the temp root".
+directories matching `prefixes` older than `maxAgeMs` — **default 24 hours**
+(`WORKER_TEMP_RETENTION_MS`). The worker sweeps once at startup and then hourly
+(`TEMP_CLEANUP_INTERVAL_MS`), so a crashed run's files are reclaimed without a
+restart. Pass your own prefixes; the default `media-worker-*` set matches what
+this package creates. An empty list or an empty string is refused, because
+either would degenerate into "delete everything in the temp root".
+
+### Reference adapter caveat
+
+`src/example-adapter.mjs` keeps leases in an **in-memory** `Map`. Restarting the
+process loses them, and it performs no real work; it exists so the server can be
+started and tested. Do not deploy it as-is — supply your own `validateRequest`
+and `startRun`.
 
 ## Metrics
 
