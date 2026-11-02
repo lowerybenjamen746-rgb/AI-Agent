@@ -1,70 +1,124 @@
 # AI-AGENT
 
-Reusable infrastructure for running media jobs on a Node host.
+Reusable infrastructure for running media jobs on a Node.js host.
 
-This repository contains three small, independently usable packages extracted
-from a private media-automation application and generalised so they do not
-depend on it:
+Three independent packages, each usable on its own. They were extracted from a
+private media-automation application and generalised so nothing here depends on
+it. There is no shared runtime code between them.
 
-| Package | What it does | License |
-|---|---|---|
-| [`packages/media-worker`](packages/media-worker) | Lease-fenced HTTP worker: authentication, `/health`, `/ready`, `/work`, temp reaping, graceful shutdown — with your coordinator plugged in as adapters | GPL-3.0-or-later |
-| [`packages/medkit`](packages/medkit) | Native FFmpeg execution backend: binary discovery and capability proof, read-only-bundle staging, bounded runs with progress, cancellation, plus a pure MP4/WebM container probe | GPL-3.0-or-later |
-| [`packages/transcript-utils`](packages/transcript-utils) | Provider-agnostic transcript timing: absolute-timestamp mapping, word-timeline repair, segment selection, SRT generation and re-timing | MIT |
+## The three packages
 
-## Why these three
+| Package | Purpose | Main dependency | License |
+|---|---|---|---|
+| [`media-worker`](packages/media-worker) | Lease-fenced HTTP worker: auth, `/health`, `/ready`, `/work`, temp reaping, graceful shutdown | Node.js built-ins only | GPL-3.0-or-later |
+| [`medkit`](packages/medkit) | FFmpeg execution backend, MP4 metadata probe, aspect-crop helper | FFmpeg (you supply it) | GPL-3.0-or-later |
+| [`transcript-utils`](packages/transcript-utils) | Absolute timestamps, word timelines, segment selection, SRT generation | Node.js built-ins only | MIT |
 
-A render worker looks simple until it has to answer the questions that decide
-whether a queue is trustworthy:
+Dependency and licence columns are taken from the package manifests and
+`docs/LICENSING.md`. The split follows the dependency graph: anything that drives
+FFmpeg is GPL, the pure data utilities are MIT.
 
-- **Who owns the unit?** The worker accepts a delivery only after its lease is
-  validated, answers exactly once, and never turns a post-acceptance failure
-  into a second reply. A duplicate delivery of the same lease is idempotent; a
-  different lease is refused.
-- **Is the host actually able to do the work?** `medkit` proves the FFmpeg
-  build can run the chain you need *before* a job starts, rather than failing
-  mid-encode. It never silently substitutes a different binary.
-- **Are timings honest?** `transcript-utils` keeps measured timings verbatim,
-  marks derived ones as `estimated`, and refuses malformed transcripts instead
-  of emitting subtitles that drift.
+## Is this for you?
 
-## Install and run
+| You want to… | Start with |
+|---|---|
+| Accept jobs over HTTP and run them exactly once per lease | `media-worker` |
+| Find FFmpeg, prove it can run your chain, then run it | `medkit` |
+| Turn ASR timings into correct, clip-relative subtitles | `transcript-utils` |
+| Do all three in one service | All three — they compose, but none imports another |
 
-Requires Node.js 20.11 or newer.
+## Requirements
+
+- **Node.js 20.11 or newer** (tested on 20.11, 22 and 24).
+- **FFmpeg** for `medkit` only — this repository does not ship a binary.
+  Point `FFMPEG_PATH` at a build, or put `ffmpeg` on `PATH`.
+- No database, queue or network service is required to run the examples.
+
+## Clone and install
 
 ```bash
 git clone https://github.com/lowerybenjamen746-rgb/AI-AGENT.git
-cd AI-AGENT/packages/media-worker
-npm test
-MEDIA_WORKER_TOKEN="$(openssl rand -hex 32)" npm start
+cd AI-AGENT
+npm ci          # workspace install: TypeScript only
+npm run build   # compiles medkit and transcript-utils to dist/
 ```
 
-Then:
+`media-worker` ships plain JavaScript and needs no build step.
+
+**The packages are not published to npm.** `npm install @ai-agent/…` does not
+work yet. Install from this repository by path:
 
 ```bash
-curl -s localhost:8787/health   # {"status":"ok","contract":"media-worker-v1"}
-curl -s localhost:8787/ready    # 200 when the adapter's checks pass, 503 otherwise
+npm install /path/to/AI-AGENT/packages/medkit
 ```
 
-The example adapter accepts any well-formed `{ "unit": { "id", "lease": { "leaseToken" } } }`
-payload against an in-memory registry. Replace it with your own — see
+## Build and test
+
+```bash
+npm run build            # TypeScript → dist/ (required before the examples run)
+npm run typecheck        # tsc --noEmit; checks types, writes nothing
+npm test                 # 3 package suites + example smoke tests
+npm run test:examples    # example smoke tests only
+npm run lint             # license, secret, artifact and env-file checks
+
+# FFmpeg integration tests run only when a binary is available:
+FFMPEG_PATH=/usr/bin/ffmpeg npm test
+```
+
+## Run the examples
+
+```bash
+node examples/01-media-worker/run.mjs
+FFMPEG_PATH=/usr/bin/ffmpeg node examples/02-medkit/run.mjs
+node examples/03-transcript-utils/run.mjs
+```
+
+Each prints what it actually observed. Details: [examples/README.md](examples/README.md).
+
+### Minimal worker usage
+
+```bash
+cd packages/media-worker
+MEDIA_WORKER_TOKEN="$(openssl rand -hex 32)" npm start
+curl -s localhost:8787/health   # {"status":"ok","contract":"media-worker-v1"}
+```
+
+The bundled entry point uses an in-memory reference adapter. For real work,
+call `createWorker()` with your own `validateRequest` / `startRun` — see
 [docs/WORKER.md](docs/WORKER.md).
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Worker guide](docs/WORKER.md)
+- [Architecture](docs/ARCHITECTURE.md) — package boundaries and data flow
+- [Worker guide](docs/WORKER.md) — endpoints, configuration, operational limits
 - [Testing](docs/TESTING.md)
-- [Licensing](docs/LICENSING.md)
+- [Licensing](docs/LICENSING.md) — why GPL for some packages
 - [Releasing](docs/RELEASING.md)
-- [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md)
+- [External testing](docs/EXTERNAL-TESTING.md) — how to try the packages independently
 
-## Status
+## Project status and limitations
 
-Pre-1.0 (`0.1.0`). The packages are functional and tested; the public API may
-change between minor versions until `1.0.0`. No production users are claimed.
+- Version `0.1.0`, pre-`1.0.0`: the public API may change between minor versions.
+- **No external users, contributors or adoption are claimed.** The project is
+  newly published.
+- The packages are not on npm, and the `@ai-agent` scope has not been verified
+  as owned by this project.
+- `media-worker` speaks HTTP only; terminate TLS in front of it.
+- `medkit` never downloads an FFmpeg binary for you, and refuses to substitute a
+  different build than the one you configured.
+- `transcript-utils` has no ASR provider clients; it operates on data you supply.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). In short: open an issue first for
+behaviour changes, keep the packages independent, add a regression test for every
+fix, and never commit a secret. Report vulnerabilities via [SECURITY.md](SECURITY.md).
+
+The repository includes a [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-This repository is mixed-licensed; see [docs/LICENSING.md](docs/LICENSING.md)
-for the per-package map and the FFmpeg obligations that motivate it.
+Mixed licensing — see [docs/LICENSING.md](docs/LICENSING.md):
+
+- `packages/media-worker`, `packages/medkit` — **GPL-3.0-or-later**
+- `packages/transcript-utils` — **MIT**

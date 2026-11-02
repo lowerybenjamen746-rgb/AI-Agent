@@ -24,6 +24,16 @@ believe it has, and whether the worker was reachable from an untrusted network.
 - Command injection through FFmpeg arguments (paths must never be shell-joined).
 - Any secret material committed to the repository or written to logs.
 
+## Supply chain
+
+- GitHub Actions are pinned to commit SHAs; `npm run lint` fails on a mutable
+  tag reference.
+- CI runs `npm audit --audit-level=high` across the whole workspace, including
+  dev dependencies, and fails on a high or critical advisory.
+- Dependencies are installed from the committed lockfile (`npm ci`), never with
+  `npm install` in CI.
+- No FFmpeg binary is distributed; you provide the build and its obligations.
+
 ## Supported versions
 
 The project is pre-1.0. Security fixes are issued on `main` only, as patch

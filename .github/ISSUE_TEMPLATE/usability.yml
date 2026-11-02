@@ -1,0 +1,98 @@
+---
+name: Installation problem or usability feedback
+description: Report a problem installing, building or using one of the packages
+title: "[usability] "
+labels: ["usability"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying AI-AGENT. Please fill this in as precisely as you can —
+        the environment details are usually what identifies the problem.
+
+        **Do not paste secrets.** Remove tokens, API keys, credentials and
+        absolute paths that reveal private directory names before posting.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package tested
+      options:
+        - media-worker
+        - medkit
+        - transcript-utils
+        - all three / repository setup
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: e.g. Ubuntu 24.04, macOS 15.1, Windows 11 WSL2
+      placeholder: Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`
+      placeholder: v20.11.1
+    validations:
+      required: true
+  - type: input
+    id: ffmpeg
+    attributes:
+      label: FFmpeg version (medkit only)
+      description: Output of `ffmpeg -version | head -1`, or "not installed"
+      placeholder: ffmpeg version 6.0
+    validations:
+      required: false
+  - type: input
+    id: command
+    attributes:
+      label: Installation command
+      description: The exact command you ran
+      placeholder: npm install /path/to/AI-AGENT/packages/medkit
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: |
+        The smallest script or command sequence that reproduces it. A few lines
+        are enough; a full project is not necessary.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: errors
+    attributes:
+      label: Error output
+      description: Relevant output with secrets removed
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have removed all secrets, tokens and credentials from this report.
+          required: true
+        - label: I checked the package README and `docs/` for an existing answer.
+          required: true
