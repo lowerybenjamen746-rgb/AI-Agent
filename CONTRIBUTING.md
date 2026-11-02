@@ -71,6 +71,21 @@ If you change a `test` script, run the suite on the minimum version too:
 /path/to/node-20.11/bin/node --test test/*.test.mjs
 ```
 
+## Packaging guards
+
+`medkit` and `transcript-utils` compile to `dist/`, which is not committed. Both
+declare a `prepack` guard (`scripts/require-dist.mjs`) so that `npm pack` and
+`npm publish` fail loudly instead of producing a tarball whose `main` does not
+exist:
+
+```
+Refusing to pack .../packages/medkit: dist/index.js is missing.
+Run `npm run build` ... first.
+```
+
+`prepublishOnly` already builds on publish, but it does not run for a bare
+`npm pack`, which is why the separate guard exists. Do not remove it.
+
 ## GitHub Actions must be pinned
 
 Workflow actions are pinned to a full commit SHA, not a version tag:
