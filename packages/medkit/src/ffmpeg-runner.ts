@@ -8,7 +8,7 @@
  *
  * Server-only: it imports `node:child_process` and `node:fs`.
  *
- * Provenance: adapted from ClipForge's `src/lib/ffmpeg/server-runtime.ts`.
+ * Provenance: adapted from an earlier server-runtime implementation.
  * The fleet-specific parts (invocation budgets from a private pipeline, the
  * project's media-selection policy, its resource ledger, and its own render
  * filter list) were removed; discovery, staging, probing and execution were
