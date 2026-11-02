@@ -1,0 +1,52 @@
+{
+  "name": "@ai-agent/transcript-utils",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Provider-agnostic transcript timing utilities: word timelines, absolute timestamp mapping and SRT generation.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./srt": {
+      "types": "./dist/srt.d.ts",
+      "default": "./dist/srt.js"
+    },
+    "./timestamps": {
+      "types": "./dist/timestamps.d.ts",
+      "default": "./dist/timestamps.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node --test \"test/*.test.mjs\""
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^20.19.0"
+  },
+  "keywords": [
+    "transcript",
+    "srt",
+    "subtitles",
+    "timestamps",
+    "whisper"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lowerybenjamen746-rgb/AI-AGENT.git",
+    "directory": "packages/transcript-utils"
+  }
+}

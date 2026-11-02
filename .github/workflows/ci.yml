@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20.11', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: media-worker (no dependencies)
+        working-directory: packages/media-worker
+        run: npm test
+
+      - name: transcript-utils
+        working-directory: packages/transcript-utils
+        run: |
+          npm ci
+          npm run build
+          node --test "test/*.test.mjs"
+
+      - name: medkit
+        working-directory: packages/medkit
+        run: |
+          npm ci
+          npm run build
+          node --test "test/*.test.mjs"
+
+      - name: medkit FFmpeg integration (one job only)
+        if: matrix.node == '24'
+        working-directory: packages/medkit
+        env:
+          FFMPEG_PATH: /usr/bin/ffmpeg
+        run: |
+          ffmpeg -version | head -1
+          node --test "test/ffmpeg-runner.test.mjs"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: install workspace tooling
+        run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: secret scan (tracked files only)
+        run: |
+          if git ls-files -z | xargs -0 grep -nIE \
+            'eyJhbGciOi|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AIza[0-9A-Za-z_-]{35}'; then
+            echo "::error::credential-shaped string committed"; exit 1
+          fi
+          echo "no credential-shaped strings found"
+      - name: refuse committed environment files
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "::error::environment file is tracked"; exit 1
+          fi
+          echo "no environment files tracked"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: dependency audit
+        run: |
+          for pkg in packages/transcript-utils packages/medkit; do
+            (cd "$pkg" && npm audit --omit=dev --audit-level=high)
+          done
+
+  licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: license map is complete
+        run: |
+          test -f LICENSE
+          test -f LICENSES/GPL-3.0-or-later.txt
+          test -f LICENSES/MIT.txt
+          grep -q '"license": "GPL-3.0-or-later"' packages/media-worker/package.json
+          grep -q '"license": "GPL-3.0-or-later"' packages/medkit/package.json
+          grep -q '"license": "MIT"' packages/transcript-utils/package.json
+      - name: no FFmpeg binary is distributed
+        run: |
+          if git ls-files | xargs -r file | grep -i 'ELF .*executable'; then
+            echo "::error::a binary is committed; FFmpeg must not be redistributed"; exit 1
+          fi
+          echo "no binaries tracked"

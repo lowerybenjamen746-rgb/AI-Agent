@@ -1,0 +1,21 @@
+{
+  "name": "ai-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable Node infrastructure for media jobs: a lease-fenced worker, an FFmpeg execution backend, and transcript timing utilities.",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "workspaces": [
+    "packages/media-worker",
+    "packages/medkit",
+    "packages/transcript-utils"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @ai-agent/medkit --workspace @ai-agent/transcript-utils",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run build --workspaces --if-present",
+    "lint": "node scripts/repository-check.mjs"
+  }
+}

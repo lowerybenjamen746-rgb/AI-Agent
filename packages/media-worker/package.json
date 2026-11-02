@@ -1,0 +1,42 @@
+{
+  "name": "@ai-agent/media-worker",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Lease-fenced HTTP media worker with adapter-driven validation, execution, authentication and readiness.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "bin": {
+    "media-worker": "src/index.mjs"
+  },
+  "exports": {
+    ".": "./src/server.mjs",
+    "./handshake": "./src/work-handshake.mjs",
+    "./startup-endpoint": "./src/startup-endpoint.mjs",
+    "./temp-cleanup": "./src/temp-cleanup.mjs",
+    "./example-adapter": "./src/example-adapter.mjs"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "probe": "node src/probe-metrics.mjs"
+  },
+  "keywords": [
+    "media-worker",
+    "worker",
+    "lease",
+    "ffmpeg",
+    "job-queue"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lowerybenjamen746-rgb/AI-AGENT.git",
+    "directory": "packages/media-worker"
+  }
+}
