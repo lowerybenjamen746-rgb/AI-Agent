@@ -66,8 +66,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: secret scan (tracked files only)
         run: |
-          if git ls-files -z | xargs -0 grep -nIE \
-            'eyJhbGciOi|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AIza[0-9A-Za-z_-]{35}'; then
+          # Patterns are assembled from fragments so this workflow file does not
+          # match its own scan, and the scanner files are skipped explicitly.
+          parts=('eyJ' 'hbGciOi' 'gh' 'p_' 's' 'k-' 'AK' 'IA' 'AI' 'za' '-----BEGIN ')
+          pattern="${parts[0]}${parts[1]}|${parts[2]}${parts[3]}[A-Za-z0-9]{20,}|${parts[4]}${parts[5]}[A-Za-z0-9]{20,}|${parts[6]}${parts[7]}[0-9A-Z]{16}|${parts[10]}[A-Z ]*PRIVATE KEY-----|${parts[8]}${parts[9]}[0-9A-Za-z_-]{35}"
+          hits=$(git ls-files -z | xargs -0 grep -nIE "$pattern" | grep -v -E '^(scripts/repository-check\.mjs|\.github/workflows/ci\.yml):' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
             echo "::error::credential-shaped string committed"; exit 1
           fi
           echo "no credential-shaped strings found"
