@@ -30,14 +30,29 @@ npm test
 npm run lint
 ```
 
-`npm test` runs 71 package tests plus the example smoke tests. FFmpeg
-integration tests are skipped unless a binary is available:
+`npm test` runs **81 tests** in total:
+
+| Suite | Tests |
+|---|---|
+| `media-worker` | 32 |
+| `medkit` | 21 |
+| `transcript-utils` | 18 |
+| examples + packaging (`examples/test/`) | 10 |
+
+Of those 81, **8 are `medkit` FFmpeg integration tests** (real encode, timeout
+kill, cancellation, workspace file API). They are skipped unless an FFmpeg
+binary is available, so a run without one reports 81 tests with 8 skipped:
 
 ```bash
+# without FFmpeg: 81 tests, 8 skipped
+npm test
+
+# with FFmpeg: 81 tests, 0 skipped
 FFMPEG_PATH=/usr/bin/ffmpeg npm test
 ```
 
-Record the exact numbers you see. If a test is skipped, that is not a pass.
+Record the exact numbers you see. A test that was skipped — including those 8 —
+is not a pass.
 
 ## 3. Run the examples
 
