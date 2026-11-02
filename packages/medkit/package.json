@@ -1,0 +1,57 @@
+{
+  "name": "@ai-agent/medkit",
+  "version": "0.1.0",
+  "private": false,
+  "description": "FFmpeg execution backend, container metadata probing and aspect-crop helpers for Node media pipelines.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./ffmpeg": {
+      "types": "./dist/ffmpeg-runner.d.ts",
+      "default": "./dist/ffmpeg-runner.js"
+    },
+    "./probe": {
+      "types": "./dist/video-probe.d.ts",
+      "default": "./dist/video-probe.js"
+    },
+    "./aspect": {
+      "types": "./dist/aspect-crop.d.ts",
+      "default": "./dist/aspect-crop.js"
+    }
+  },
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node --test \"test/*.test.mjs\""
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^20.19.0"
+  },
+  "keywords": [
+    "ffmpeg",
+    "video",
+    "mp4",
+    "metadata",
+    "media"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lowerybenjamen746-rgb/AI-AGENT.git",
+    "directory": "packages/medkit"
+  }
+}
