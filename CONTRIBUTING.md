@@ -71,6 +71,21 @@ If you change a `test` script, run the suite on the minimum version too:
 /path/to/node-20.11/bin/node --test test/*.test.mjs
 ```
 
+## GitHub Actions must be pinned
+
+Workflow actions are pinned to a full commit SHA, not a version tag:
+
+```yaml
+# correct — cannot be repointed upstream
+- uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+# rejected by `npm run lint`
+- uses: actions/checkout@v4
+```
+
+`npm run lint` enforces this. Keep the `# Version: …` comment from the current
+entry so the pinned SHA stays human-readable, and update both together when
+bumping an action.
+
 ## Rules
 
 1. **Do not weaken a guarantee to make a test pass.** The handshake ordering,

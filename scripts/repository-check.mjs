@@ -3,7 +3,7 @@
 // license/package consistency, no committed environment files, no binaries, and
 // no credential-shaped strings in tracked text files.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 
 const problems = [];
 
@@ -76,7 +76,31 @@ function checkContents(files) {
   }
 }
 
+function checkWorkflowPinning() {
+  const dir = '.github/workflows';
+  let entries = [];
+  try {
+    entries = readdirSync(dir).filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'));
+  } catch {
+    return; // no workflows is not an error
+  }
+  for (const name of entries) {
+    const file = `${dir}/${name}`;
+    const text = readFileSync(file, 'utf8');
+    for (const line of text.split('\n')) {
+      const match = line.match(/^\s*(?:-\s*)?uses:\s*(\S+)/);
+      if (!match) continue;
+      const ref = match[1];
+      if (ref.startsWith('./') || ref.startsWith('docker://')) continue;
+      const version = ref.split('@')[1] ?? '';
+      // A mutable tag such as @v4 can be repointed upstream; require a full SHA.
+      if (!/^[0-9a-f]{40}$/.test(version)) fail(`${file}: action "${ref}" is not pinned to a commit SHA`);
+    }
+  }
+}
+
 checkLicenses();
+checkWorkflowPinning();
 const files = trackedFiles();
 checkTrackedFiles(files);
 checkContents(files);

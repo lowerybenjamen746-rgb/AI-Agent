@@ -16,8 +16,11 @@ jobs:
       matrix:
         node: ['20.11', '22', '24']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Pinned to a commit SHA: a mutable tag could be repointed upstream.
+      # Version: actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # Version: actions/setup-node v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: ${{ matrix.node }}
 
@@ -50,8 +53,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Pinned to a commit SHA: a mutable tag could be repointed upstream.
+      # Version: actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # Version: actions/setup-node v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: install workspace tooling
@@ -62,7 +68,9 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit SHA: a mutable tag could be repointed upstream.
+      # Version: actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: secret scan (tracked files only)
         run: |
           # Patterns are assembled from fragments so this workflow file does not
@@ -81,19 +89,19 @@ jobs:
             echo "::error::environment file is tracked"; exit 1
           fi
           echo "no environment files tracked"
-      - uses: actions/setup-node@v4
+      # Version: actions/setup-node v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: dependency audit
-        run: |
-          for pkg in packages/transcript-utils packages/medkit; do
-            (cd "$pkg" && npm audit --omit=dev --audit-level=high)
-          done
+      - name: dependency audit (all packages, dev included)
+        run: npm audit --audit-level=high
 
   licenses:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit SHA: a mutable tag could be repointed upstream.
+      # Version: actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: license map is complete
         run: |
           test -f LICENSE
