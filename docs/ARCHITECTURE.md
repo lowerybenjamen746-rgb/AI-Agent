@@ -1,70 +1,140 @@
 # Architecture
 
-Three packages, no shared runtime code. Each can be installed and used alone.
+Three packages with **no shared runtime code**. Each can be installed and used
+alone; none imports another. The diagram below shows the intended composition,
+not a required one.
 
+```mermaid
+flowchart TD
+    dev["Developer application<br/>(your coordinator / service)"]
+
+    subgraph worker["packages/media-worker — GPL-3.0-or-later"]
+        srv["server.mjs<br/>routing, auth, lifecycle"]
+        hs["work-handshake.mjs<br/>validate → 202, one reply"]
+        ep["startup-endpoint.mjs<br/>bind resolution"]
+        tc["temp-cleanup.mjs<br/>stale workspace reaper"]
+        ad["adapters (you supply)<br/>getToken · validateRequest<br/>startRun · readinessChecks"]
+    end
+
+    subgraph media["packages/medkit — GPL-3.0-or-later"]
+        detect["detectFFmpeg()<br/>discovery + capability proof"]
+        run["runFFmpeg()<br/>bounded execution, progress, cancel"]
+        probe["probeVideoContainer()<br/>MP4 box walk, no decode"]
+        crop["buildAspectCropFilter()"]
+    end
+
+    ffmpeg[["FFmpeg binary<br/>(you install it)"]]
+    out["Output artifacts<br/>rendered media, SRT, progress events"]
+
+    subgraph tx["packages/transcript-utils — MIT"]
+        abs["absoluteSegments()<br/>provider time → source time"]
+        sel["selectTranscriptSegments()"]
+        srt["canonicalTranscriptToSrt()<br/>scaleSrtTimestamps()"]
+    end
+
+    asr["ASR / provider output"]
+
+    dev -->|"HTTP: /health /ready /work"| srv
+    srv --> hs
+    hs --> ad
+    srv --> ep
+    srv --> tc
+    ad -.->|"your code may call"| media
+    detect --> ffmpeg
+    run --> ffmpeg
+    ffmpeg --> out
+    probe --> out
+    crop --> run
+    asr --> abs --> sel --> srt --> out
 ```
-                        ┌──────────────────────────────┐
-   coordinator ── HTTP──▶│  packages/media-worker       │
-   (your app)            │  server.mjs                  │
-                         │   ├─ startup-endpoint.mjs    │  bind resolution
-                         │   ├─ work-handshake.mjs      │  validation → 202, one reply
-                         │   ├─ temp-cleanup.mjs        │  stale-workdir reaper
-                         │   └─ adapters (you supply)   │  validate / run / readiness
-                         └───────────┬──────────────────┘
-                                     │ injects
-                                     ▼
-                         ┌──────────────────────────────┐
-                         │  packages/medkit             │
-                         │  ffmpeg-runner.ts            │  discovery, staging, exec
-                         │  video-probe.ts              │  MP4 box walk (no decode)
-                         │  aspect-crop.ts             │  crop/scale filter builder
-                         └──────────────────────────────┘
 
-                         ┌──────────────────────────────┐
-      ASR output ───────▶│  packages/transcript-utils   │──▶ SRT / cues
-                         │  timestamps → selected-words │
-                         │  → word-timeline → srt       │
-                         └──────────────────────────────┘
-```
+The dotted edge is deliberate: the worker does **not** depend on `medkit`. A
+worker can run any workload, and `medkit` is equally usable from a CLI script
+with no HTTP server at all. `transcript-utils` is separate from both.
 
-## media-worker
+## Package boundaries
 
-The server owns process concerns only. Everything coordinator-specific is an
-adapter:
+| Package | Runtime dependencies | Build step | Owns |
+|---|---|---|---|
+| `media-worker` | none (Node built-ins) | none (plain `.mjs`) | HTTP contract, auth, lifecycle, temp reaping |
+| `medkit` | none at runtime; expects an FFmpeg binary | TypeScript → `dist/` | Process execution, container metadata, filter building |
+| `transcript-utils` | none (Node built-ins) | TypeScript → `dist/` | Time arithmetic and subtitle serialisation |
 
-| Adapter | Contract |
+No package imports from another. Duplicating a few lines is preferred over a
+cross-package dependency, so each stays independently installable.
+
+## Data flow
+
+1. **Ingress.** The coordinator sends `POST /work` with a unit id and lease token.
+2. **Validation.** `validateRequest` checks the lease against *your* store
+   **before** anything is acknowledged.
+3. **Acceptance.** The worker replies `202` exactly once and starts the run.
+4. **Work.** `startRun` performs the job. It may call `medkit` to encode, and
+   `transcript-utils` to build subtitles — both are ordinary function calls.
+5. **Output.** Artifacts land wherever your runner writes them; the worker itself
+   only reports the outcome.
+
+## Authentication boundary
+
+`POST /work` requires `Authorization: Bearer <token>`; comparison is
+constant-time and an **unset token is never valid** (every call is `401`).
+`/health` and `/ready` are deliberately unauthenticated so a platform probe can
+reach them. The worker binds **loopback by default** and speaks **plain HTTP** —
+it expects TLS to terminate in front of it.
+
+Leases are the second boundary: possessing a valid token is not enough; the
+lease must match what your store says is current, and a competing lease is
+refused with `409`.
+
+## Temporary file lifecycle
+
+- Workspaces are created under the OS temp directory (`TMPDIR`).
+- `temp-cleanup.mjs` removes only directories matching an explicit prefix list
+  (default `media-worker-*`), older than **24 hours** by default.
+- The sweep runs at startup and then hourly, so a crashed run's leftovers are
+  reclaimed without a restart.
+- `medkit` stages font/fontconfig assets **once per process** and removes them on
+  process exit, best effort.
+
+## Error handling
+
+| Situation | Behaviour |
 |---|---|
-| `getToken()` | Bearer token the worker accepts. Unset is never valid. |
-| `validateRequest({ text, contractHeader })` | Throw to reject (400); return `{ request, store }` to accept. `request.unit.id` and `request.unit.lease.leaseToken` are required by the handshake. |
-| `startRun({ request, store })` | Return `{ run, abort }`. `run` is awaited; `abort` is called on shutdown. |
-| `readinessChecks()` | Map of named booleans; all must be true for `/ready` 200. |
+| Body over 256 KiB | `400`, never truncated |
+| Unreadable or invalid body | `400` |
+| Missing/incorrect token | `401`, run never starts |
+| Competing lease for an in-flight unit | `409` |
+| Same lease redelivered | idempotent `202` |
+| Run fails **after** acceptance | logged; still exactly one reply — the lease is the authority |
+| Shutdown during work | new deliveries refused, in-flight runs aborted, close always settles |
+| FFmpeg missing or incapable | detection reports `available: false` with the reason; never a silent substitution |
+| FFmpeg exits non-zero / times out | non-zero code or a timeout error; cancellation settles once |
+| Unreadable media metadata | `null`, never `0` |
+| Malformed transcript timings | throws instead of emitting drifting subtitles |
 
-Ordering is the whole design: a delivery is validated **before** the 202 is
-written, and after acceptance no error can produce a second HTTP reply —
-the durable lease, not the response, is the authority on the outcome.
+## Dependencies
 
-## medkit
+- **Node.js 20.11+** for all three.
+- **FFmpeg** for `medkit` only, discovered via `FFMPEG_PATH` → bundled
+  `ffmpeg-static` → `PATH` → known install locations. The first real build found
+  decides; if it lacks a required filter or encoder it is refused by name.
+- No database, queue, HTTP framework or ORM is required by any package.
 
-`detectFFmpeg()` walks candidates in a fixed order (`FFMPEG_PATH` is
-authoritative and ends the search; then a bundled `ffmpeg-static`, `PATH`, and
-known install locations). The first candidate that is a real FFmpeg build
-decides the outcome: if it lacks a required filter or encoder the result is
-`available: false` naming the gap. There is no fallback to a different build.
+## Licensing boundaries
 
-If a pipeline's declared requirement is narrower or wider than the defaults,
-pass `requiredFilters` / `requiredEncoders`. `runFFmpeg()` bounds wall time,
-parses progress from FFmpeg's own `time=` output only once the input duration
-is known, and settles exactly once on `close`.
+- `media-worker` and `medkit` — **GPL-3.0-or-later**, because they drive FFmpeg
+  builds that are commonly GPLv3.
+- `transcript-utils` — **MIT**, with no FFmpeg dependency and no runtime
+  dependencies.
+- No FFmpeg binary is distributed. The font used for text rendering ships with
+  its own notice.
 
-`probeVideoContainer()` reads an MP4's box structure (`moov`/`trak`/`mdhd`/
-sample tables) from a buffer already in memory. It decodes nothing; anything it
-cannot read is `null`, never `0`.
+See [LICENSING.md](LICENSING.md).
 
-## transcript-utils
+## Detail per package
 
-`absoluteSegment()` adds a chunk's source offset exactly once, so the canonical
-transcript holds absolute source seconds that survive chunk reordering and
-provider fallback. `selectTranscriptSegments()` clamps the overlap with a
-window and rejects malformed timings. `clipSegmentsToRange()` converts absolute
-segments to clip-relative cues, and `scaleSrtTimestamps()` re-times an existing
-SRT when a duration-changing pass ran between cue generation and burn-in.
+- `media-worker`: adapter contracts and limits — [WORKER.md](WORKER.md)
+- `medkit`: `detectFFmpeg()` order, `runFFmpeg()` bounds, probe semantics
+- `transcript-utils`: `absoluteSegment()` applies a chunk offset exactly once;
+  `selectTranscriptSegments()` clamps to a window and rejects malformed timings;
+  `scaleSrtTimestamps()` re-times an existing SRT.

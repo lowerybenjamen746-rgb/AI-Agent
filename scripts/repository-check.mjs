@@ -8,7 +8,16 @@ import { readFileSync, statSync } from 'node:fs';
 const problems = [];
 
 function trackedFiles() {
-  return execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+  try {
+    return execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).split('\0').filter(Boolean);
+  } catch (error) {
+    // This check reads the git index. Outside a checkout (e.g. a tarball or a
+    // copied tree) there is nothing to verify, so say that plainly instead of
+    // dumping a child-process stack trace.
+    console.error('repository check requires a Git checkout: `git ls-files` failed.');
+    console.error('Run it from the repository root (`npm run lint`), not from an exported copy.');
+    process.exit(2);
+  }
 }
 
 function fail(message) {

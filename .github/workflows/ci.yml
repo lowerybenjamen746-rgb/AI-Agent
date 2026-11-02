@@ -21,32 +21,31 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      - name: media-worker (no dependencies)
-        working-directory: packages/media-worker
-        run: npm test
+      # The four required commands, in order. `npm test` runs the three package
+      # suites AND the example smoke tests; it must not skip anything, so the
+      # build above is a hard prerequisite.
+      - name: npm ci
+        run: npm ci
 
-      - name: transcript-utils
-        working-directory: packages/transcript-utils
+      - name: npm run build
+        run: npm run build
+
+      - name: npm test
+        env:
+          FFMPEG_PATH: ${{ matrix.node == '24' && '/usr/bin/ffmpeg' || '' }}
         run: |
-          npm ci
-          npm run build
+          if [ "${{ matrix.node }}" = "24" ]; then ffmpeg -version | head -1; fi
           npm test
 
-      - name: medkit
-        working-directory: packages/medkit
-        run: |
-          npm ci
-          npm run build
-          npm test
+      - name: npm run lint
+        run: npm run lint
 
       - name: medkit FFmpeg integration (one job only)
         if: matrix.node == '24'
         working-directory: packages/medkit
         env:
           FFMPEG_PATH: /usr/bin/ffmpeg
-        run: |
-          ffmpeg -version | head -1
-          node --test test/ffmpeg-runner.test.mjs
+        run: node --test test/ffmpeg-runner.test.mjs
 
   lint:
     runs-on: ubuntu-latest

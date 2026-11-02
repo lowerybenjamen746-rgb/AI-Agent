@@ -14,8 +14,9 @@
   ],
   "scripts": {
     "build": "npm run build --workspace @ai-agent/medkit --workspace @ai-agent/transcript-utils",
-    "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run build --workspaces --if-present",
-    "lint": "node scripts/repository-check.mjs"
+    "test": "npm run test --workspaces --if-present && npm run test:examples",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "node scripts/repository-check.mjs",
+    "test:examples": "node --test examples/test/*.test.mjs"
   }
 }

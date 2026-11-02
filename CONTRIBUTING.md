@@ -14,6 +14,13 @@ Thanks for considering a contribution.
 ## Development
 
 ```bash
+# from the repository root
+npm ci
+npm run build            # compiles medkit + transcript-utils to dist/
+npm run typecheck        # tsc --noEmit per package; emits no files
+npm test                 # three package suites + example smoke tests
+npm run lint
+
 # per package
 cd packages/media-worker && npm test
 cd packages/medkit && npm test           # add FFMPEG_PATH=… to run integration tests
@@ -22,6 +29,47 @@ cd packages/transcript-utils && npm test
 
 Requirements: Node.js 20.11+. No build is needed for `media-worker`; the other
 two build with `npm run build`.
+
+`npm run build` and `npm run typecheck` are different commands on purpose:
+
+| Command | Runs | Writes files |
+|---|---|---|
+| `npm run build` | `tsc -p tsconfig.json` per package | **yes** — `dist/` |
+| `npm run typecheck` | `tsc -p tsconfig.json --noEmit` per package | no |
+
+The examples import from `dist/`, so `npm run build` must run before
+`npm test`; `npm run typecheck` alone is enough to check types in an editor or
+CI job that does not need the output.
+
+## Node.js 20 compatibility
+
+The minimum supported version is Node.js **20.11**, and it behaves differently
+from 22 and 24 in one way that is easy to trip over:
+
+```bash
+# Correct on every version — the SHELL expands the glob
+node --test test/*.test.mjs
+
+# Broken on 20.11 — quotes stop shell expansion, so the runner gets the literal
+# string "test/*.test.mjs" and exits with "Could not find ..."
+node --test "test/*.test.mjs"
+```
+
+Node 20.11's `--test` accepts file paths, not glob patterns. So:
+
+- **Never quote a test glob** in `package.json` scripts, workflows, or docs.
+- Use shell-expanded paths everywhere. A bare directory argument
+  (`node --test test/`) is *not* portable: it works on 20.11 but fails on 22/24,
+  so the scripts here never rely on it.
+- This exact mistake has broken CI twice in this repository's history; both
+  fixes are recorded in `CHANGELOG.md`.
+
+If you change a `test` script, run the suite on the minimum version too:
+
+```bash
+# with a Node 20.11 install (e.g. nvm, fnm, or a downloaded tarball)
+/path/to/node-20.11/bin/node --test test/*.test.mjs
+```
 
 ## Rules
 
