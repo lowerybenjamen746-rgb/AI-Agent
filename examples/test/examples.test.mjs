@@ -57,7 +57,7 @@ test('example 2 (medkit) runs and reports availability honestly', { timeout: 180
     assert.match(stdout, /drawtext render works\s+yes/);
     assert.match(stdout, /output starts with ftyp\s+ftyp/);
   } else {
-    assert.match(stdout, /No usable FFmpeg found/, 'must explain why it skipped');
+    assert.match(stdout, /No usable FFmpeg binary was found\./, 'must explain why it skipped');
   }
 });
 
