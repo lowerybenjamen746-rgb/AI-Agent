@@ -30,14 +30,14 @@ jobs:
         run: |
           npm ci
           npm run build
-          node --test "test/*.test.mjs"
+          npm test
 
       - name: medkit
         working-directory: packages/medkit
         run: |
           npm ci
           npm run build
-          node --test "test/*.test.mjs"
+          npm test
 
       - name: medkit FFmpeg integration (one job only)
         if: matrix.node == '24'
@@ -46,7 +46,7 @@ jobs:
           FFMPEG_PATH: /usr/bin/ffmpeg
         run: |
           ffmpeg -version | head -1
-          node --test "test/ffmpeg-runner.test.mjs"
+          node --test test/ffmpeg-runner.test.mjs
 
   lint:
     runs-on: ubuntu-latest
